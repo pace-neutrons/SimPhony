@@ -26,17 +26,22 @@ def get_parser() -> argparse.ArgumentParser:
                         help="Plot and show how performance data has changed"
                              " over time for the files in the directory you"
                              " have specified as part of this argument")
+    parser.add_argument("-pf", "--performance-file", action="store",
+                        dest="performance_file",
+                        help="Plot and how how using more threads affects the"
+                             " walltimes of functions across multiple"
+                             " different materials for the specified file.")
     parser.add_argument("-sf", "--speedup-file", action="store",
                         dest="speedup_file",
                         help="Plot and show how using more threads affects the"
-                             " performance of functions across multiple"
+                             " speedup of functions across multiple"
                              " different materials for the specified file.")
     return parser
 
 
 def call_plot(dir_or_file: str, plot_func, plot_args):
     if os.path.isdir(dir_or_file) or os.path.isfile(dir_or_file):
-        plot_func(*plot_args)
+        plot_func(plot_args)
     else:
         print(
             "{} is not a recognised file or directory. "
