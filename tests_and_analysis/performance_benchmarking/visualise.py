@@ -1,8 +1,9 @@
 import argparse
 import matplotlib.pyplot as plt
-from visualise.performance_over_time import plot_median_values
+from visualise.walltimes_over_time import plot_median_values
 from visualise.speedups_over_time import plot_speedups_over_time
 from visualise.speedups import plot_speedups_for_file
+from visualise.walltimes import plot_walltimes_for_file
 import os
 
 
@@ -16,14 +17,14 @@ def get_parser() -> argparse.ArgumentParser:
         The path of the directory
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("-st", "--speedup-over-time", action="store",
+    parser.add_argument("-s", "--speedup-over-time", action="store",
                         dest="speedup_over_time_dir",
                         help="Plot and show how the speedups data has changed"
                              " over time for the files in the directory you"
                              " have specified as part of this argument.")
     parser.add_argument("-p", "--performance", action="store",
                         dest="performance_dir",
-                        help="Plot and show how performance data has changed"
+                        help="Plot and show how walltimes have changed"
                              " over time for the files in the directory you"
                              " have specified as part of this argument")
     parser.add_argument("-pf", "--performance-file", action="store",
@@ -67,5 +68,10 @@ if __name__ == "__main__":
         call_plot(
             args_parsed.speedup_file,
             plot_speedups_for_file, args_parsed.speedup_file
+        )
+    if args_parsed.performance_file:
+        call_plot(
+            args_parsed.performance_file,
+            plot_walltimes_for_file, args_parsed.performance_file
         )
     plt.show()
