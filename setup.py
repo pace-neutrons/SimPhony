@@ -96,7 +96,7 @@ def run_setup(build_c=True):
         extras_require={
             'matplotlib': ['matplotlib>=2.0.0'],
             'phonopy_reader': ['h5py>=2.7.0', 'PyYAML>=3.13'],
-            'brille': ['brille>=4.3.0']
+            'brille': ['brille>=0.4.3']
         },
         entry_points={'console_scripts': [
             'euphonic-dispersion = euphonic.cli.dispersion:main',

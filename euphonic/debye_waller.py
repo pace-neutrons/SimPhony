@@ -1,5 +1,7 @@
 import inspect
 
+import numpy as np
+
 from euphonic.validate import _check_constructor_inputs, _check_unit_conversion
 from euphonic.io import (_obj_to_json_file, _obj_from_json_file,
                          _obj_to_dict, _process_dict)
@@ -130,3 +132,44 @@ class DebyeWaller(object):
         DebyeWaller
         """
         return _obj_from_json_file(cls, filename)
+
+
+def _calculate_debye_waller(qpts, frequencies, eigenvectors, atom_masses,
+                            temperature, weights=None):
+    kB = (1*ureg.k).to('hartree/K').magnitude
+    mass_term = 1/(4*atom_masses)
+    n_qpts = len(qpts)
+    if weights is None:
+        weights = np.full(n_qpts, 1/n_qpts)
+
+    # Determine q-points near the gamma point and mask out their
+    # acoustic modes due to the potentially large 1/frequency factor
+    TOL = 1e-8
+    is_small_q = np.sum(np.square(qpts), axis=1) < TOL
+    freq_mask = np.ones(frequencies.shape, dtype=np.int32)
+    freq_mask[is_small_q, :3] = 0
+
+    if temperature > 0:
+        x = frequencies/(2*kB*temperature)
+        freq_term = 1/(frequencies*np.tanh(x))
+    else:
+        freq_term = 1/frequencies
+    dw = np.zeros((len(atom_masses), 3, 3))
+
+    # Calculating the e.e* term is expensive, do in chunks
+    chunk = 1000
+    for i in range(int((n_qpts - 1)/chunk) + 1):
+        qi = i*chunk
+        qf = min((i + 1)*chunk, n_qpts)
+
+        evec_term = np.real(
+            np.einsum('ijkl,ijkm->ijklm',
+                      eigenvectors[qi:qf],
+                      np.conj(eigenvectors[qi:qf])))
+
+        dw += (np.einsum('i,k,ij,ij,ijklm->klm',
+                         weights[qi:qf], mass_term, freq_term[qi:qf],
+                         freq_mask[qi:qf], evec_term))
+    dw = dw/np.sum(weights)
+
+    return dw
