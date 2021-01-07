@@ -10,6 +10,10 @@
 #include "py_util.h"
 #include "util.h"
 
+// Headers for profiling
+#include <stdbool.h>
+#include <time.h>
+
 static PyObject *calculate_phonons(PyObject *self, PyObject *args) {
 
     // Define input args
@@ -182,6 +186,8 @@ static PyObject *calculate_phonons(PyObject *self, PyObject *args) {
         return NULL;
     }
 
+    bool profile = true;
+
     omp_set_num_threads(n_threads);
     #pragma omp parallel
     {
@@ -195,8 +201,18 @@ static PyObject *calculate_phonons(PyObject *self, PyObject *args) {
         if (dmats_len == 0) {
             dmat_per_q = (double*) malloc(dmat_elems*sizeof(double));
         }
+        int *n_calls;
+        double *call_time;
+        double start, end, total_start, total_end, total_time;
+        if (profile) {
+            total_time = 0;
+            n_calls = calloc(5, sizeof(int));
+            call_time = calloc(5, sizeof(double));
+        }
         #pragma omp for
         for (q = 0; q < n_rqpts; q++) {
+            if (profile) total_start = clock();
+
             double *qpt, *dmat, *eval;
             qpt = (rqpts + 3*q);
             eval = (evals + q*3*n_atoms);
@@ -206,14 +222,29 @@ static PyObject *calculate_phonons(PyObject *self, PyObject *args) {
             } else {
                 dmat = (dmats + q*dmat_elems);
             }
+
+            if (profile) start = clock();
             calculate_dyn_mat_at_q(qpt, n_atoms, n_cells, max_ims, n_sc_ims,
                 sc_im_idx, cell_ogs, sc_ogs, fc, dmat);
+            if (profile) {
+                end = clock();
+                n_calls[0]++;
+                call_time[0] = call_time[0]
+                    + ((double) (end - start))/CLOCKS_PER_SEC;
+            }
 
             if (dipole) {
+                if (profile) start = clock();
                 calculate_dipole_correction(qpt, n_atoms, cell_vec, recip_vec,
                     atom_r, born, dielectric, H_ab, dipole_cells,
                     n_dipole_cells, gvec_phases, gvecs_cart, n_gvecs,
                     dipole_q0, eta, corr);
+                if (profile) {
+                    end = clock();
+                    n_calls[1]++;
+                    call_time[1] = call_time[1]
+                        + ((double) (end - start))/CLOCKS_PER_SEC;
+                }
                 add_arrays(dmat_elems, corr, dmat);
             }
 
@@ -237,8 +268,38 @@ static PyObject *calculate_phonons(PyObject *self, PyObject *args) {
             }
 
             mass_weight_dyn_mat(dmat_weighting, n_atoms, dmat);
+            if (profile) start = clock();
             diagonalise_dyn_mat_zheevd(n_atoms, qpt, dmat, eval, zheevd);
+            if (profile) {
+                end = clock();
+                n_calls[2]++;
+                call_time[2] = call_time[2]
+                    + ((double) (end - start))/CLOCKS_PER_SEC;
+            }
             evals_to_freqs(n_atoms, eval);
+
+            if (profile) {
+                total_end = clock();
+                total_time = total_time
+                    + ((double) (total_end - total_start))/CLOCKS_PER_SEC;
+            }
+
+        }
+        if (profile) {
+            char filename[sizeof "euphonic_c_ext.99.profile"];
+            FILE *fptr;
+            sprintf(filename, "euphonic_c_ext.%02d.profile",
+                    omp_get_thread_num());
+            fptr = fopen(filename, "w");
+            fprintf(fptr, "%-30s %06d %8.4f\n",
+                    "total", 1, total_time);
+            fprintf(fptr, "%-30s %06d %8.4f\n",
+                    "calculate_dyn_mat_at_q", n_calls[0], call_time[0]);
+            fprintf(fptr, "%-30s %06d %8.4f\n",
+                    "calculate_dipole_correction", n_calls[1], call_time[1]);
+            fprintf(fptr, "%-30s %06d %8.4f\n",
+                    "diagonalise_dyn_mat", n_calls[2], call_time[2]);
+            fclose(fptr);
         }
     }
 
