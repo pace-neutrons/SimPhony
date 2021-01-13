@@ -203,7 +203,9 @@ static PyObject *calculate_phonons(PyObject *self, PyObject *args) {
         }
         int *n_calls;
         double *call_time;
-        double start, end, total_start, total_end, total_time;
+        struct timespec ti, tf;
+        struct timespec tot_ti, tot_tf;
+        double total_time;
         if (profile) {
             total_time = 0;
             n_calls = calloc(5, sizeof(int));
@@ -211,7 +213,7 @@ static PyObject *calculate_phonons(PyObject *self, PyObject *args) {
         }
         #pragma omp for
         for (q = 0; q < n_rqpts; q++) {
-            if (profile) total_start = clock();
+            if (profile) clock_gettime(CLOCK_REALTIME, &tot_ti);
 
             double *qpt, *dmat, *eval;
             qpt = (rqpts + 3*q);
@@ -223,27 +225,27 @@ static PyObject *calculate_phonons(PyObject *self, PyObject *args) {
                 dmat = (dmats + q*dmat_elems);
             }
 
-            if (profile) start = clock();
+            if (profile) clock_gettime(CLOCK_REALTIME, &ti);
             calculate_dyn_mat_at_q(qpt, n_atoms, n_cells, max_ims, n_sc_ims,
                 sc_im_idx, cell_ogs, sc_ogs, fc, dmat);
             if (profile) {
-                end = clock();
+                clock_gettime(CLOCK_REALTIME, &tf);
                 n_calls[0]++;
-                call_time[0] = call_time[0]
-                    + ((double) (end - start))/CLOCKS_PER_SEC;
+                call_time[0] = call_time[0] + (tf.tv_sec - ti.tv_sec)
+                    + (tf.tv_nsec - ti.tv_nsec)/((double) 1e9);
             }
 
             if (dipole) {
-                if (profile) start = clock();
+                if (profile) clock_gettime(CLOCK_REALTIME, &ti);
                 calculate_dipole_correction(qpt, n_atoms, cell_vec, recip_vec,
                     atom_r, born, dielectric, H_ab, dipole_cells,
                     n_dipole_cells, gvec_phases, gvecs_cart, n_gvecs,
                     dipole_q0, eta, corr);
                 if (profile) {
-                    end = clock();
+                    clock_gettime(CLOCK_REALTIME, &tf);
                     n_calls[1]++;
-                    call_time[1] = call_time[1]
-                        + ((double) (end - start))/CLOCKS_PER_SEC;
+                    call_time[1] = call_time[1] + (tf.tv_sec - ti.tv_sec)
+                        + (tf.tv_nsec - ti.tv_nsec)/((double) 1e9);
                 }
                 add_arrays(dmat_elems, corr, dmat);
             }
@@ -268,20 +270,20 @@ static PyObject *calculate_phonons(PyObject *self, PyObject *args) {
             }
 
             mass_weight_dyn_mat(dmat_weighting, n_atoms, dmat);
-            if (profile) start = clock();
+            if (profile) clock_gettime(CLOCK_REALTIME, &ti);
             diagonalise_dyn_mat_zheevd(n_atoms, qpt, dmat, eval, zheevd);
             if (profile) {
-                end = clock();
+                clock_gettime(CLOCK_REALTIME, &tf);
                 n_calls[2]++;
-                call_time[2] = call_time[2]
-                    + ((double) (end - start))/CLOCKS_PER_SEC;
+                call_time[2] = call_time[2] + (tf.tv_sec - ti.tv_sec)
+                    + (tf.tv_nsec - ti.tv_nsec)/((double) 1e9);
             }
             evals_to_freqs(n_atoms, eval);
 
             if (profile) {
-                total_end = clock();
-                total_time = total_time
-                    + ((double) (total_end - total_start))/CLOCKS_PER_SEC;
+                clock_gettime(CLOCK_REALTIME, &tot_tf);
+                total_time = total_time + (tot_tf.tv_sec - tot_ti.tv_sec)
+                    + (tot_tf.tv_nsec - tot_ti.tv_nsec)/((double) 1e9);
             }
 
         }
