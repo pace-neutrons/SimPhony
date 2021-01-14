@@ -475,11 +475,16 @@ class ForceConstants:
                             '_dipole_q0']
             _ensure_contiguous_attrs(self, attrs, opt_attrs=dipole_attrs)
             reciprocal_asr = 1 if asr == 'reciprocal' else 0
+            from timeit import default_timer as timer
+            start =  timer()
             euphonic_c.calculate_phonons(
                 self, cell_vectors, recip_vectors, reduced_qpts, split_idx,
                 q_dirs, fc_img_weighted, sc_offsets, recip_asr_correction,
                 dyn_mat_weighting, dipole, reciprocal_asr, splitting, rfreqs,
                 reigenvecs, n_threads, scipy.__path__[0])
+            end = timer()
+            with open('euphonic_c_ext.00.profile', 'a') as f:
+                f.write(f'{"total time in C":30} {1:06d} {end-start:8.4f}')
         except ImportError:
             if not fall_back_on_python:
                 raise ImportCError((
