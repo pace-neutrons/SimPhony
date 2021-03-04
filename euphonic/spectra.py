@@ -322,6 +322,21 @@ class Spectrum1D(Spectrum):
                           optional=['x_tick_labels'])
         return cls(d['x_data'], d['y_data'], x_tick_labels=d['x_tick_labels'])
 
+    @classmethod
+    def from_castep_phonon_dos(cls: S, filename: str) -> S:
+        """
+        Reads DOS from a CASTEP .phonon_dos file
+
+        Parameters
+        ----------
+        filename
+            The path and name of the .phonon_dos file to read
+        """
+        from euphonic.readers.castep import read_phonon_dos_data
+        data = read_phonon_dos_data(filename)
+        return Spectrum1D(data['dos_bins']*ureg(data['dos_bins_unit']),
+                          data['dos']*ureg('dimensionless'))
+
     def broaden(self, x_width, shape='gauss'):
         """
         Broaden y_data and return a new broadened spectrum object
@@ -476,6 +491,7 @@ class Spectrum1DCollection(collections.abc.Sequence, Spectrum):
         y_data = Quantity(y_data_magnitude, y_data_units)
 
         return cls(x_data, y_data, x_tick_labels=x_tick_labels)
+
 
     def to_dict(self) -> Dict[str, Any]:
         """
